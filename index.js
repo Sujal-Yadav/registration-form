@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const fs = require('fs');
 const app = express();
 const port = 3000;
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -25,18 +26,17 @@ app.get('/login', (req, res) => {
 
 app.post('/registration', async (req, res) => {
     try {
-        const existingUser = await user.find({ email: req.body.email });
-
-        if (existingUser > 0) {
-            // return res.status(400).send('User already registered');
-            return res.status(400).sendFile("pages/login.html", {root: __dirname});
+        const email = req.body.email;
+        const existingUser = await user.findOne({ email });
+        console.log(existingUser)
+        if (existingUser) {
+            return res.status(400).sendFile("pages/login.html", { root: __dirname });
         }
         else {
             const registerdata = new user(req.body);
             await registerdata.save();
-            // return res.status(400).send('User successfully registered');
-            res.status(200).sendFile("pages/register.html", { root: __dirname });
-        }    
+            return res.redirect(`/home/${registerdata._id}`);
+        }
 
     } catch (error) {
         console.error(error);
@@ -44,29 +44,49 @@ app.post('/registration', async (req, res) => {
     }
 });
 
-app.get('/registration', async (req, res) => {
-    res.sendFile('pages/signup.html', {root: __dirname});
+app.get('/home/:id', async (req, res) => {
+    const id = req.params.id;
+    const userid = await user.findOne({ _id: id });
+    console.log(userid);
+    let htmlFile = fs.readFileSync(__dirname + '/pages/register.html', 'utf8', err => {
+        if (err) {
+            console.log(err.message);
+
+            throw err;
+        }
+        console.log('data written to file');
+    });
+
+    let posts = userid.username;
+    console.log(posts);
+    let modifiedhtml = htmlFile.replace('{ user }', posts);
+    res.send(modifiedhtml);
 })
+
 app.get('/validation', async (req, res) => {
-    res.sendFile('pages/login.html', {root: __dirname});
+    return res.sendFile('pages/login.html', { root: __dirname });
+})
+
+app.get('/registration', async (req, res) => {
+    return res.sendFile('pages/signup.html', { root: __dirname });
 })
 
 app.post('/validation', async (req, res) => {
     try {
-        const existingUser = await user.findOne({ email: req.body.email });
-        console.log(existingUser);
+        const email = req.body.email;
+        const existingUser = await user.findOne({ email });
         if (existingUser) {
-            if(existingUser.email == req.body.email && 
+            if (existingUser.email == req.body.email &&
                 existingUser.password === req.body.password) {
-                return res.status(200).sendFile("pages/register.html", {root: __dirname});
+                return res.redirect(`/home/${existingUser._id}`);
             }
-            else{
+            else {
                 return res.status(401).send('Incorrect Password');
             }
         }
         else {
-            return res.status(200).sendFile("pages/signup.html", {root: __dirname});
-        }    
+            return res.status(200).sendFile("pages/signup.html", { root: __dirname });
+        }
 
     } catch (error) {
         console.error(error);
